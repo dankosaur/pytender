@@ -288,11 +288,41 @@ class TenderFAQ(TenderResource):
     def section_href(self):
         return self.raw_data.section_href
 
+class TenderSection(TenderResource):
+    """ aka the knowledgebase """
+    @property
+    def id(self):
+        return int(self.raw_data.href.split('/')[-1])
+
+    @property
+    def title(self):
+        return self.raw_data.title
+
+    @property
+    def permalink(self):
+        return self.raw_data.permalink
+
+    @property
+    def html_href(self):
+        return self.raw_data.html_href
+
+    @property
+    def href(self):
+        return self.raw_data.href
+
+    @property
+    def faqs_href(self):
+        return self.raw_data.faqs_href
+
+    @property
+    def faqs_count(self):
+        return self.raw_data.faqs_count
+
+    def faqs(self):
+        return TenderCollection(self.client, self.raw_data.faqs_href, TenderFAQ, 'faqs')
+
 
 class TenderQueue(object):
-    pass
-
-class TenderSection(object):
     pass
 
 class TenderClientCredentialsException(Exception):
@@ -350,12 +380,15 @@ class TenderClient(object):
     
     def categories(self, page=None):
         return TenderCollection(self, self.raw_data.categories_href, TenderCategory, 'categories')
-    
+
     def users(self):
         return TenderCollection(self, self.raw_data.users_href, TenderUser, 'users')
 
     def faqs(self):
         return TenderCollection(self, self.raw_data.faqs_href, TenderFAQ, 'faqs')
+
+    def sections(self):
+        return TenderCollection(self, self.raw_data.sections_href, TenderSection, 'sections')
 
     def create_discussion(self, title, body, category_id, author_email=None, public=True, **kwargs):
         '''
