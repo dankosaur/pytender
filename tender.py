@@ -250,6 +250,45 @@ class TenderCategory(TenderResource):
     def create_discussion(self, title, body, author_email=None, public=True, **kwargs):
         return self.client.create_discussion(self, title, body, self.id, author_email=None, public=True, **kwargs)
 
+class TenderFAQ(TenderResource):
+    """ aka the knowledgebase """
+    @property
+    def id(self):
+        return int(self.raw_data.href.split('/')[-1])
+
+    @property
+    def title(self):
+        return self.raw_data.title
+
+    @property
+    def permalink(self):
+        return self.raw_data.permalink
+
+    @property
+    def keywords(self):
+        return self.raw_data.keywords
+
+    @property
+    def formatted_body(self):
+        return self.raw_data.formatted_body
+
+    @property
+    def body(self):
+        return self.raw_data.body
+
+    @property
+    def html_href(self):
+        return self.raw_data.html_href
+
+    @property
+    def href(self):
+        return self.raw_data.href
+
+    @property
+    def section_href(self):
+        return self.raw_data.section_href
+
+
 class TenderQueue(object):
     pass
 
@@ -314,6 +353,9 @@ class TenderClient(object):
     
     def users(self):
         return TenderCollection(self, self.raw_data.users_href, TenderUser, 'users')
+
+    def faqs(self):
+        return TenderCollection(self, self.raw_data.faqs_href, TenderFAQ, 'faqs')
 
     def create_discussion(self, title, body, category_id, author_email=None, public=True, **kwargs):
         '''
