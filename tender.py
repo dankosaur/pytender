@@ -256,10 +256,17 @@ class TenderQueue(object):
 class TenderSection(object):
     pass
 
+class TenderClientCredentialsException(Exception):
+    pass
+
 class TenderClient(object):
-    def __init__(self, app_name, secret, user_email, user_id=None):
+    def __init__(self, app_name, secret=None, user_email=None, user_id=None, api_key=None):
+        if not (secret and user_email) and not (api_key):
+            raise TenderClientCredentials("must supply either secret and user_email or api_key")
+
         self.user_email = user_email
         self.user_id = user_id
+        self.api_key = api_key
         self.app_name = app_name
         self.secret = secret
         
@@ -335,8 +342,11 @@ class TenderClient(object):
         '''
         req = urllib2.Request(url=url)
         req.add_header('Accept', 'application/vnd.tender-v1+json')
-        req.add_header('X-Multipass', self.multipass())
-        
+        if self.api_key:
+            req.add_header('X-Tender-Auth', self.api_key)
+        elif self.secret:
+            req.add_header('X-Multipass', self.multipass())
+
         if data:
             req.add_header('Content-Type', 'application/json')
             req.add_data(simplejson.dumps(data))
