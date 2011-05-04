@@ -9,6 +9,7 @@ setup(name = 'tender',
       url = 'http://github.com/dankosaur/pytender',
       download_url = 'http://github.com/dankosaur/pytender',
       description  = 'Python TenderApp Client',
+      packages = ['tender'],
+      package_dir = { 'tender' : 'src' },
       license = '?',
-      install_requires = ['tpg>=3.1.2']
       )
