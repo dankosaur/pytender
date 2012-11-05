@@ -288,6 +288,9 @@ class TenderFAQ(TenderResource):
     def section_href(self):
         return self.raw_data.section_href
 
+    def __str__(self):
+        return "<TenderFAQ id=%d title=\"%s\">" % (self.id, self.title)
+
 class TenderSection(TenderResource):
     """ aka the knowledgebase """
     @property
@@ -320,6 +323,9 @@ class TenderSection(TenderResource):
 
     def faqs(self):
         return TenderCollection(self.client, self.raw_data.faqs_href, TenderFAQ, 'faqs')
+
+    def __str__(self):
+        return "<TenderSection id=%d title=\"%s\">" % (self.id, self.title)
 
 
 class TenderQueue(object):
