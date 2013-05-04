@@ -356,7 +356,7 @@ class TenderClientCredentialsException(Exception):
 class TenderClient(object):
     def __init__(self, app_name, secret=None, user_email=None, user_id=None, api_key=None):
         if not (secret and user_email) and not (api_key):
-            raise TenderClientCredentials("must supply either secret and user_email or api_key")
+            raise TenderClientCredentialsException("must supply either secret and user_email or api_key")
 
         self.user_email = user_email
         self.user_id = user_id
