@@ -1,4 +1,5 @@
-import urllib2, math
+import math
+import requests
 from base64 import b64encode
 from datetime import datetime, timedelta
 from time import strptime
@@ -44,7 +45,7 @@ class TenderCollection(list):
     def _load_items(self):
         url = build_url(self.url_template)
 
-        resource = self.client.__get__(url)
+        resource = self.client.get(url)
         #add items from first page
         self._add_to_list(resource.get(self.list_key))
 
@@ -56,7 +57,7 @@ class TenderCollection(list):
         #get all needed pages and build complete list (remember we already have first page)
         for page in xrange(2, pages + 1):
             url = build_url(self.url_template, {'page': page})
-            self._add_to_list(self.client.__get__(url).get(self.list_key))
+            self._add_to_list(self.client.get(url).get(self.list_key))
 
     def _add_to_list(self, items):
         '''Adds each item from items to self'''
@@ -69,11 +70,12 @@ class TenderResource(object):
     '''Any resource like category, discussion, comment
     Loads itself from give resource_href if no raw_data given'''
 
-    def __init__(self, client, resource_href=None, raw_data=None):
+    def __init__(self, client, resource_href=None, raw_data=None, section=None):
         self.client = client
+        self.section = section # hack
 
         if not raw_data:
-            self.raw_data = self.client.__get__(resource_href)
+            self.raw_data = self.client.get(resource_href)
         else:
             self.raw_data = raw_data
 
@@ -89,9 +91,18 @@ class TenderResource(object):
         if action_key in self.raw_data:
             url = build_url(self.raw_data[action_key], kwargs)
             #stub data to make urllib2 use POST
-            return self.client.__get__(url, data='post')
+            return self.client.get(url, data='post')
         else:
             raise AttributeError('Unknown action')
+
+    def create(self):
+        self.client.create(self.resource_create_base, self.raw_data)
+
+    def save(self):
+        self.client.save(self.href, self.raw_data)
+
+    def delete(self):
+        self.client.delete(self.href)
 
 class TenderUser(TenderResource):
     @property
@@ -130,7 +141,7 @@ class TenderDiscussion(TenderResource):
         ''' if this discussion is from a list, this function
         will fetch things like the comments that are only available when
         getting a discussion by itself'''
-        self.raw_data = self.client.__get__(self.raw_data.href)
+        self.raw_data = self.client.get(self.raw_data.href)
 
     @property
     def number(self):
@@ -253,6 +264,10 @@ class TenderCategory(TenderResource):
 class TenderFAQ(TenderResource):
     """ aka the knowledgebase """
     @property
+    def resource_create_base(self):
+        return build_url(self.section.faqs_href)
+
+    @property
     def id(self):
         return int(self.raw_data.href.split('/')[-1])
 
@@ -293,6 +308,10 @@ class TenderFAQ(TenderResource):
 
 class TenderSection(TenderResource):
     """ aka the knowledgebase """
+    @property
+    def resource_create_base(self):
+        return self.client.sections_href
+
     @property
     def id(self):
         return int(self.raw_data.href.split('/')[-1])
@@ -345,38 +364,18 @@ class TenderClient(object):
         self.app_name = app_name
         self.secret = secret
 
-        self.raw_data = self.__get__('http://api.tenderapp.com/%s' % app_name)
+        self.raw_data = self.get('http://api.tenderapp.com/%s' % app_name)
 
         self.href = self.raw_data.href
 
-    def multipass(self, expires=None, email=None, **kw):
-        '''
-            takes required (any any number of extra) args and creates a multipass url
-            for loggin a user into tender using your sites login.
 
-            username: the name of the user being logged in
-            email: the email of the user being logged in
-            unique_id: a unique id for this user (in case their name or email changes)
-            expires: time--in seconds--to keep a user logged into tender
-            trusted: if the spam filter should be bypassed
-            avatar_url: image to use for this users avatar
-            extras: anything else you may want to display about the user
+    @property
+    def sections_href(self):
+        return build_url(self.raw_data.sections_href)
 
-            via https://help.tenderapp.com/faqs/setup-installation/multipass
-        '''
-        data = {
-            'email': email or self.user_email,
-            'expires': (datetime.now()+timedelta(seconds=expires or 1209600)).strftime("%Y-%m-%dT%H:%M")
-        }
-        data.update(kw)
-
-        if not 'unique_id' in data and self.user_id:
-            data['unique_id'] = self.user_id
-
-        return MultiPass(self.app_name, self.secret).encode(data)
-
-    def multipass_url(self, tender_url, multipass):
-        return '%s?sso=%s' % (tender_url, multipass)
+    @property
+    def faqs_href(self):
+        return build_url(self.raw_data.faqs_href)
 
     def profile(self):
         return TenderUser(self, self.raw_data.profile_href)
@@ -414,28 +413,41 @@ class TenderClient(object):
         #additional arguments
         payload.update(kwargs)
 
-        return TenderDiscussion(self, raw_data=self.__get__(url, payload))
+        return TenderDiscussion(self, raw_data=self.get(url, payload))
 
     # The stuff that does the work...
-    def _send_query(self, url, data=None):
+    def _send_query(self, url, data=None, method='GET', desired_status=200):
         '''
         Send a query to Tender API
         '''
-        req = urllib2.Request(url=url)
-        req.add_header('Accept', 'application/vnd.tender-v1+json')
+        auth = None
+        headers = {'Accept': 'application/vnd.tender-v1+json'}
         if self.api_key:
-            req.add_header('X-Tender-Auth', self.api_key)
+            headers['X-Tender-Auth'] = self.api_key
         elif self.secret:
-            req.add_header('X-Multipass', self.multipass())
+            auth = (self.user_email, self.secret)
 
         if data:
-            req.add_header('Content-Type', 'application/json')
-            req.add_data(simplejson.dumps(data))
+            headers['Content-Type'] = 'application/json'
+            data = simplejson.dumps(data)
 
-        f = urllib2.urlopen(req)
-        return f.read()
+        req = requests.request(method, url, data=data, headers=headers, auth=auth)
+        if req.status_code != desired_status:
+            raise Exception('HTTP error: %s', str(req))
+        return req.text
 
-    def __get__(self, url, data=None):
+    def create(self, url, data=None):
+        response = self._send_query(url, data, method='POST', desired_status=201)
+        return ResponseDict(simplejson.loads(response))
+
+    def get(self, url, data=None):
         response = self._send_query(url, data)
         return ResponseDict(simplejson.loads(response))
 
+    def save(self, url, data=None):
+        response = self._send_query(url, data, method='PUT')
+        return ResponseDict(simplejson.loads(response))
+
+    def delete(self, url):
+        response = self._send_query(url, {}, method='DELETE')
+        return True
