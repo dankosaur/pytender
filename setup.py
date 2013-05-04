@@ -3,7 +3,7 @@
 from setuptools import setup
 
 setup(name = 'tender',
-      version = '0.2',
+      version = '0.3',
       author = 'A few different folks on github',
       author_email = 'dan@tracelytics.com',
       url = 'http://github.com/dankosaur/pytender',
@@ -11,5 +11,5 @@ setup(name = 'tender',
       description  = 'Python TenderApp Client',
       packages = ['tender'],
       package_dir = { 'tender' : 'src' },
-      license = '?',
+      license = 'MIT',
       )
